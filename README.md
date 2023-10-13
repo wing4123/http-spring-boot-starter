@@ -25,8 +25,8 @@ http.form(url, formData).requestString();
 ```
 * upload file request
 ```
-Map<String, String> files = new HashMap<>();
-formData.put("file1", Files.readAllBytes(Paths.get("d:/image0.jpg")));
+Map<String, byte[]> files = new HashMap<>();
+formData.put("file1", Files.readAllBytes(Paths.get("d:/image.jpg")));
 Map<String, String> params = new HashMap<>();
 formData.put("param1", "value1");
 http.upload(url, files, params).requestString();
@@ -34,7 +34,8 @@ http.upload(url, files, params).requestString();
 or
 ```
 http.upload(url)
-  .addFile("name", "fileName", Files.readAllBytes(Paths.get("d:/image.jpg")))
+  .addFile("file1", "fileName", Files.readAllBytes(Paths.get("d:/image1.jpg")))
+  .addFile("file2", "d:/image1.jpg")
   .addParam("key", "value")
   .requestString();
 ```
