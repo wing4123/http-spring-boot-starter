@@ -1,11 +1,11 @@
 # Getting Started
 
-* import dependency
+* add dependency
 ```
 <dependency>
     <groupId>io.github.wing4123</groupId>
-	<artifactId>http-spring-boot-starter</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+    <artifactId>http-spring-boot-starter</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
 </dependency>
 ```
 * get request
