@@ -131,7 +131,20 @@ public class Request {
 	 * @return
 	 * @throws HttpException
 	 */
-	public CompletableFuture<JsonNode> requestJson() throws HttpException {
+	public JsonNode requestJson() throws HttpException {
+		try {
+			return objectMapper.readTree(this.request());
+		} catch (IOException e) {
+			throw new HttpException("json解析异常");
+		}
+	}
+	
+	/**
+	 * 发送请求并获取JsonNode类型返回值
+	 * @return
+	 * @throws HttpException
+	 */
+	public CompletableFuture<JsonNode> asyncRequestJson() throws HttpException {
 		return this.asyncRequest().thenApply(result -> {
 			try {
 				return objectMapper.readTree(result);
