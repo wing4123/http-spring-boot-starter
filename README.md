@@ -1,6 +1,6 @@
 # Getting Started
 
-* add dependency
+* 添加依赖
 ```
 <dependency>
     <groupId>io.github.wing4123</groupId>
@@ -8,22 +8,22 @@
     <version>0.0.1-SNAPSHOT</version>
 </dependency>
 ```
-* get request
+* get请求
 ```
 Http.get(url).requestString();
 ```
-* post json request
+* post请求发送json
 ```
 String jsonStr = "{\"key\", \"value\"}";
 http.post(url, jsonStr).requestString();
 ```
-* form request
+* form表单请求
 ```
 Map<String, String> formData = new HashMap<>();
 formData.put("param1", "value1");
 http.form(url, formData).requestString();
 ```
-* upload file request
+* 文件上传
 ```
 Map<String, byte[]> files = new HashMap<>();
 formData.put("file1", Files.readAllBytes(Paths.get("d:/image.jpg")));
@@ -31,7 +31,7 @@ Map<String, String> params = new HashMap<>();
 formData.put("param1", "value1");
 http.upload(url, files, params).requestString();
 ```
-or
+或者
 ```
 http.upload(url)
   .addFile("file1", "fileName", Files.readAllBytes(Paths.get("d:/image1.jpg")))
@@ -39,14 +39,18 @@ http.upload(url)
   .addParam("key", "value")
   .requestString();
 ```
-* add headers
+* 添加请求头
 ```
 String result = http.get(url).headers("Authorization", "token").requestString();
 ```
-* result type
+* 返回数据类型
 ```
 String result = http.get(url).requestString();
 byte[] result = http.get(url).requestBytes();
 JsonNode result = http.get(url).requestJson();
 User result = http.get(url).requestObject(User.class);
+```
+* 异步调用
+```
+CompletableFuture<String> future = http.get(url).asyncRequestString();
 ```
