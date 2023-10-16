@@ -3,22 +3,14 @@ package com.wing.http;
 import java.net.http.HttpClient;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-
-import org.springframework.beans.factory.annotation.Autowired;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class Http {
 	
-	@Autowired
 	private HttpClient httpClient;
 	
-	@Autowired
 	private ObjectMapper objectMapper;
 	
 	public Http(HttpClient httpClient, ObjectMapper objectMapper) {

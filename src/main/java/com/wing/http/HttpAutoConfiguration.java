@@ -4,6 +4,7 @@ import java.net.http.HttpClient;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.context.annotation.Bean;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -26,6 +27,7 @@ public class HttpAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnMissingClass("org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration")
     ObjectMapper objectMapper() {
     	return new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,false);
     }
