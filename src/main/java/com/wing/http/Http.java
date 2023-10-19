@@ -18,7 +18,7 @@ public class Http {
 		this.objectMapper = objectMapper;
 	}
 
-	public ObjectMapper getObjectMapper() {
+	public ObjectMapper objectMapper() {
 		return this.objectMapper;
 	}
 	

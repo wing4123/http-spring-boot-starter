@@ -16,7 +16,7 @@ public class Request {
 	protected String url;
 	protected String method;
 	protected byte[] body;
-	protected String[] headers = new String[] {"Content-Type", "text/plain"};
+	protected String[] headers = new String[0];
 	
 	protected HttpClient httpClient;
 	
@@ -57,6 +57,17 @@ public class Request {
 		return this;
 	}
 	
+	private HttpRequest buildRequest() {
+		HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+		        .uri(URI.create(this.url))
+		        .method(method.toUpperCase(), this.body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(this.body));
+		if (this.headers.length > 1) {
+			requestBuilder.headers(this.headers);
+		}
+		
+		return requestBuilder.build();
+	}
+	
 	/**
 	 * 发送http请求
 	 * @param url
@@ -66,34 +77,20 @@ public class Request {
 	 * @return
 	 * @throws IOException
 	 */
-	private byte[] request() throws HttpException {
+	public HttpResponse<byte[]> request() throws HttpException {
 		try {
-			HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-			        .uri(new URI(this.url))
-			        .headers(this.headers)
-			        .method(method.toUpperCase(), this.body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(this.body));
-			
-			HttpResponse<byte[]> response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray());
-			
-			if (response.statusCode() != 200) {
-	        	throw new HttpException("http请求异常, 状态码:" + response.statusCode() + ", 响应:" + new String(response.body()));
-	        }
-			
-			return response.body();
-		} catch (Exception e) {
-			e.printStackTrace();
+			HttpRequest request = this.buildRequest();
+			HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+			return response;
+		} catch (IOException | InterruptedException e) {
 			throw new HttpException("http请求异常");
 		}
 	}
 	
-	private CompletableFuture<byte[]> asyncRequest() throws HttpException {
+	public CompletableFuture<HttpResponse<byte[]>> asyncRequest() throws HttpException {
 		try {
-			HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-			        .uri(new URI(this.url))
-			        .headers(this.headers)
-			        .method(method.toUpperCase(), this.body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(this.body));
-			
-			return httpClient.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray()).thenApply(HttpResponse::body);
+			HttpRequest request = this.buildRequest();
+			return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray());
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new HttpException("http请求异常");
@@ -106,11 +103,16 @@ public class Request {
 	 * @throws HttpException
 	 */
 	public byte[] requestBytes() throws HttpException {
-		return this.request();
+		HttpResponse<byte[]> response = this.request();
+		if (response.statusCode() != 200) {
+			throw new HttpException("http请求异常,状态码：" + response.statusCode() + ", 响应体：" + new String(response.body()));
+		}
+		
+		return response.body();
 	}
 	
 	public CompletableFuture<byte[]> asyncRequestBytes() throws HttpException {
-		return this.asyncRequest();
+		return this.asyncRequest().thenApply(HttpResponse::body);
 	}
 	
 	/**
@@ -119,11 +121,11 @@ public class Request {
 	 * @throws HttpException
 	 */
 	public String requestString() throws HttpException {
-		return new String(this.request());
+		return new String(this.requestBytes());
 	}
 	
 	public CompletableFuture<String> asyncRequestString() throws HttpException {
-		return this.asyncRequest().thenApply(String::new);
+		return this.asyncRequestBytes().thenApply(String::new);
 	}
 	
 	/**
@@ -133,7 +135,7 @@ public class Request {
 	 */
 	public JsonNode requestJson() throws HttpException {
 		try {
-			return objectMapper.readTree(this.request());
+			return objectMapper.readTree(this.requestBytes());
 		} catch (IOException e) {
 			throw new HttpException("json解析异常");
 		}
@@ -145,7 +147,7 @@ public class Request {
 	 * @throws HttpException
 	 */
 	public CompletableFuture<JsonNode> asyncRequestJson() throws HttpException {
-		return this.asyncRequest().thenApply(result -> {
+		return this.asyncRequestBytes().thenApply(result -> {
 			try {
 				return objectMapper.readTree(result);
 			} catch (IOException e) {
@@ -161,14 +163,14 @@ public class Request {
 	 */
 	public <T> T requestObject(Class<T> valueType) throws HttpException {
 		try {
-			return objectMapper.readValue(this.request(), valueType);
+			return objectMapper.readValue(this.requestBytes(), valueType);
 		} catch (IOException e) {
 			throw new HttpException("json解析异常");
 		}
 	}
 	
 	public <T> CompletableFuture<T> asyncRequestObject(Class<T> valueType) throws HttpException {
-		return this.asyncRequest().thenApply(result -> {
+		return this.asyncRequestBytes().thenApply(result -> {
 			try {
 				return objectMapper.readValue(result, valueType);
 			} catch (IOException e) {

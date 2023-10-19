@@ -1,6 +1,11 @@
 package com.wing.http;
 
+import java.net.CookieManager;
+import java.net.CookiePolicy;
+import java.net.CookieStore;
 import java.net.http.HttpClient;
+import java.net.http.HttpClient.Redirect;
+import java.util.concurrent.Executors;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -22,7 +27,11 @@ public class HttpAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     HttpClient httpClient() {
-    	return HttpClient.newBuilder().build();
+    	return HttpClient.newBuilder()
+    			.cookieHandler(new CookieManager())
+    			.executor(Executors.newWorkStealingPool())
+    			.followRedirects(Redirect.ALWAYS)
+    			.build();
     }
 
     @Bean
