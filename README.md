@@ -5,7 +5,7 @@
 <dependency>
     <groupId>io.github.wing4123</groupId>
     <artifactId>http-spring-boot-starter</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.3-SNAPSHOT</version>
 </dependency>
 ```
 * get请求
