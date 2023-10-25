@@ -1,11 +1,16 @@
 package com.wing.http;
 
+import java.net.CookieManager;
 import java.net.http.HttpClient;
+import java.net.http.HttpClient.Redirect;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 public class Http {
 	
@@ -17,6 +22,17 @@ public class Http {
 		this.httpClient = httpClient;
 		this.objectMapper = objectMapper;
 	}
+	
+	public Http() {
+        this.httpClient = HttpClient.newBuilder()
+                .cookieHandler(new CookieManager())
+                .executor(Executors.newWorkStealingPool())
+                .followRedirects(Redirect.ALWAYS)
+                .build();
+        this.objectMapper = JsonMapper.builder()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .build();
+    }
 
 	public ObjectMapper objectMapper() {
 		return this.objectMapper;
