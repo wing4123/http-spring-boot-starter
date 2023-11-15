@@ -33,7 +33,7 @@ http.upload(url)
 ```
 * 添加请求头
 ```
-http.get(url).headers("Authorization", "token").send();
+http.get(url).addHeader("Authorization", "token").send();
 ```
 * 返回数据类型
 ```
