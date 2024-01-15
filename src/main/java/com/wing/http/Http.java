@@ -269,9 +269,6 @@ public class Http {
         private HttpResponse<byte[]> response;
         
         private Response(HttpResponse<byte[]> response) {
-            if(response.statusCode() != 200) {
-                throw new RuntimeException("http请求失败，状态码：" + response.statusCode());
-            }
             this.response = response;
         }
         
