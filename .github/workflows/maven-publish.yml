@@ -12,7 +12,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
       - name: Release Maven package
-        uses: samuelmeuli/action-maven-publish@v1.4.0
+        uses: samuelmeuli/action-maven-publish@v1
         with:
           # 一系列需要的密码
           gpg_private_key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}    # GPG 导出的那段长长的密钥
