@@ -11,11 +11,11 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          server-id: ossrh
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_PASSWORD
-      - name: Publish package
-        run: mvn --batch-mode deploy -P deploy
-        env:
-          MAVEN_USERNAME: wing4123
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      - name: Release Maven package
+        uses: samuelmeuli/action-maven-publish@v1.4.0
+        with:
+          # 一系列需要的密码
+          gpg_private_key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}    # GPG 导出的那段长长的密钥
+          gpg_passphrase: ${{ secrets.MAVEN_GPG_PASSPHRASE }}   # 自己设置的 GPG 密码
+          nexus_username: wing4123     # sonatype 用户名（不是邮箱）
+          nexus_password: ${{ secrets.MAVEN_CENTRAL_PASSWORD }} # sonatype 登录密码
