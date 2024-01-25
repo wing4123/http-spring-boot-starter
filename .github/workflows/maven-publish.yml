@@ -6,16 +6,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Maven Central Repository
+      - name: Import GPG signing key
+        uses: crazy-max/ghaction-import-gpg@v5
+        with:
+          gpg_private_key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+      - name: Install jdk
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Release Maven package
-        uses: samuelmeuli/action-maven-publish@v1
-        with:
-          # 一系列需要的密码
-          gpg_private_key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}    # GPG 导出的那段长长的密钥
-          gpg_passphrase: ${{ secrets.MAVEN_GPG_PASSPHRASE }}   # 自己设置的 GPG 密码
-          nexus_username: wing4123     # sonatype 用户名（不是邮箱）
-          nexus_password: ${{ secrets.MAVEN_CENTRAL_PASSWORD }} # sonatype 登录密码
+          cache: 'maven'
+          server-id: release
+          server-username: MVN_CENTRAL_USERNAME
+          server-password: MVN_CENTRAL_PASSWORD
+      - name: Release to Maven repo
+        run: |
+          mvn deploy -P release -Dgpg.keyname=${{ secrets.GPG_KEY_NAME }} -Dgpg.passphrase=${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+        env:
+          MVN_CENTRAL_USERNAME: ${{ vars.MVN_CENTRAL_USERNAME }}
+          MVN_CENTRAL_PASSWORD: ${{ secrets.MVN_CENTRAL_PASSWORD }}
