@@ -1,25 +1,28 @@
-name: release-to-maven-central
+name: Publish via Maven Central
+
 on:
   workflow_dispatch
+
 jobs:
-  publish:
+  publish-maven-central:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out Git repository
+        uses: actions/checkout@v4
 
-      - name: Set up Maven Central Repository
+      - name: Install Java and Maven
         uses: actions/setup-java@v3
         with:
-          java-version: 17
-          server-id: snapshot
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_PASSWORD
-          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
-          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+          java-version: '17'
+          distribution: 'temurin'
 
-      - name: Publish package
-        run: mvn clean deploy -P release -Dmaven.test.skip=true
-        env:
-          MAVEN_USERNAME: wing4123
-          MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+      - name: Publish to the Maven Central Repository
+        uses: samuelmeuli/action-maven-publish@v1
+        with:
+          maven_profiles: 'deploy'
+          maven_goals_phases: 'clean deploy'
+          maven_args: '-DskipTests'
+          gpg_private_key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+          nexus_username: wing4123
+          nexus_password: ${{ secrets.OSS_SONATYPE_PASSWORD }}
