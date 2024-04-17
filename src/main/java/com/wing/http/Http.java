@@ -109,6 +109,15 @@ public class Http {
         return this.request(url, "post", headers, params.getBody());
     }
     
+    /**
+     * 创建响应头请求
+     * @param url
+     * @return
+     */
+    public Request head(String url) {
+        return this.request(url, "head", null, null);
+    }
+    
     public class Request {
         private String url;
         private String method;
