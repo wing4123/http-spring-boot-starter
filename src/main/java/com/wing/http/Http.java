@@ -1,48 +1,39 @@
 package com.wing.http;
 
+import java.io.File;
 import java.io.IOException;
-import java.net.CookieManager;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpClient.Redirect;
-import java.net.http.HttpHeaders;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.FormBody;
+import okhttp3.Headers;
+import okhttp3.HttpUrl;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.RequestBody;
+
 public class Http {
     
-    private HttpClient httpClient;
+    private OkHttpClient httpClient;
     
     private ObjectMapper objectMapper;
     
-    public Http(HttpClient httpClient, ObjectMapper objectMapper) {
+    public Http(OkHttpClient httpClient, ObjectMapper objectMapper) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
     }
     
     public Http() {
-        this.httpClient = HttpClient.newBuilder()
-                .cookieHandler(new CookieManager())
-                .executor(Executors.newWorkStealingPool())
-                .followRedirects(Redirect.ALWAYS)
-                .build();
+        this.httpClient = new OkHttpClient.Builder().build();
         this.objectMapper = JsonMapper.builder()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .build();
@@ -53,24 +44,18 @@ public class Http {
     }
     
     /**
-     * 创建请求
-     * @param url
-     * @param method
-     * @param headers
-     * @param body
-     * @return
-     */
-    public Request request(String url, String method, Map<String, String> headers, byte[] body) {
-        return new Request(url, method, headers, body);
-    }
-    
-    /**
      * 创建get请求
      * @param url
      * @return
      */
     public Request get(String url) {
-        return this.request(url, "get", null, null);
+        Map<String, String> headers = new HashMap<>();
+        return new Request(url, "GET", headers, null);
+    }
+    
+    public Request delete(String url) {
+        Map<String, String> headers = new HashMap<>();
+        return new Request(url, "DELETE", headers, null);
     }
     
     /**
@@ -82,7 +67,13 @@ public class Http {
     public Request post(String url, String jsonParams) {
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
-        return this.request(url, "post", headers, jsonParams.getBytes());
+        return new Request(url, "POST", headers, RequestBody.create(jsonParams, MediaType.parse("application/json")));
+    }
+    
+    public Request put(String url, String jsonParams) {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        return new Request(url, "PUT", headers, RequestBody.create(jsonParams, MediaType.parse("application/json")));
     }
     
     /**
@@ -91,11 +82,11 @@ public class Http {
      * @param params
      * @return
      */
-    public Request form(String url, Map<String, String> params) {
+    public FormRequest form(String url, Map<String, String> params) {
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/x-www-form-urlencoded");
-        byte[] body = params.entrySet().stream().map(item -> item.getKey() + "=" + URLEncoder.encode(item.getValue(), Charset.defaultCharset())).collect(Collectors.joining("&")).getBytes();
-        return this.request(url, "post", headers, body);
+        
+        return new FormRequest(url, "POST", headers, params);
     }
     
     /**
@@ -103,34 +94,33 @@ public class Http {
      * @param url
      * @return
      */
-    public Request upload(String url, UploadParams params) {
+    public UploadRequest upload(String url) {
         Map<String, String> headers = new HashMap<>();
-        headers.put("Content-Type", "multipart/form-data; boundary=----boundary");
-        return this.request(url, "post", headers, params.getBody());
+        headers.put("Content-Type", "multipart/form-data");
+        return new UploadRequest(url, "POST", headers);
     }
     
-    /**
-     * 创建响应头请求
-     * @param url
-     * @return
-     */
-    public Request head(String url) {
-        return this.request(url, "head", null, null);
+    public Request request(String url, String method, Map<String, String> headers, RequestBody body) {
+        if (headers == null) {
+            headers = new HashMap<String, String>();
+        }
+        return new Request(url, method, headers, body);
     }
     
     public class Request {
-        private String url;
+        private HttpUrl url;
         private String method;
-        private Map<String, String> headers = new HashMap<>();
-        private byte[] body;
+        private Map<String, String> headers;
+        private RequestBody body;
         
-        private Request(String url, String method, Map<String, String> headers, byte[] body) {
-            this.url = url;
+        private Request() {
+            
+        }
+        
+        private Request(String url, String method, Map<String, String> headers, RequestBody body) {
+            this.url = HttpUrl.parse(url);
             this.method = method;
-            this.headers.put("author", "wing4123");
-            if (headers != null && !headers.isEmpty()) {
-                this.headers.putAll(headers);
-            }
+            this.headers = headers;
             this.body = body;
         }
         
@@ -155,13 +145,12 @@ public class Http {
             return this;
         }
         
-        private HttpRequest buildRequest() {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(this.url))
-                    .method(method.toUpperCase(), this.body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(this.body))
-                    .headers(headers.entrySet().stream().flatMap(item -> Stream.of(item.getKey(), item.getValue())).toArray(String[]::new))
+        private okhttp3.Request buildRequest() {
+            okhttp3.Request request = new okhttp3.Request.Builder()
+                    .url(this.url)
+                    .method(this.method.toUpperCase(), this.body)
+                    .headers(Headers.of(headers))
                     .build();
-            
             return request;
         }
         
@@ -172,8 +161,8 @@ public class Http {
          * @throws InterruptedException
          */
         public Response send() throws IOException, InterruptedException {
-            HttpRequest request = buildRequest();
-            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            okhttp3.Request request = buildRequest();
+            okhttp3.Response response = httpClient.newCall(request).execute();
             
             return new Response(response);
         }
@@ -182,102 +171,108 @@ public class Http {
          * 异步请求
          * @return
          */
-        public CompletableFuture<Response> sendAsync() {
-            HttpRequest request = buildRequest();
-            CompletableFuture<HttpResponse<byte[]>> response = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray());
+        public CompletableFuture<okhttp3.Response> sendAsync() {
+            okhttp3.Request request = buildRequest();
+            CompletableFuture<okhttp3.Response> future = new CompletableFuture<>();
+            httpClient.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call arg0, IOException e) {
+                    future.completeExceptionally(e); // 异常情况
+                }
+                @Override
+                public void onResponse(Call arg0, okhttp3.Response response) throws IOException {
+                    future.complete(response); // 正常返回
+                }
+            });
             
-            return response.thenApplyAsync(Response::new);
+            return future;
+        }
+        
+        public void sendCallBack(Callback callback) {
+            okhttp3.Request request = buildRequest();
+            httpClient.newCall(request).enqueue(callback);
         }
     }
     
-    public static class UploadParams {
-        private byte[] body = "------boundary--".getBytes();
-        private final byte[] boundary = "\r\n------boundary--".getBytes();
+    public class FormRequest extends Request {
+        private FormBody.Builder bodyBuilder = new FormBody.Builder();
         
-        public byte[] getBody() {
-            return this.body;
+        public FormRequest(String url, String method, Map<String, String> headers, Map<String, String> params) {
+            super(url, method, headers, null);
+            params.entrySet().forEach(item -> {
+                this.bodyBuilder.addEncoded(item.getKey(), item.getValue());
+            });
         }
         
-        /**
-         * 添加文件参数
-         * @param name 参数名称
-         * @param fileName 文件名称
-         * @param file 文件字节数组
-         * @return
-         */
-        public UploadParams addFile(String name, String fileName, byte[] file) {
-            this.body[this.body.length - 2] = "\r".getBytes()[0];
-            this.body[this.body.length - 1] = "\n".getBytes()[0];
-            
-            byte[] contentDisposition = String.format("Content-Disposition: form-data; name=\"%s\"; filename=\"%s\"\r\n", name, fileName).getBytes();
-            byte[] contentType = "Content-Type: application/octet-stream\r\n\r\n".getBytes();
-            
-            byte[] joinedArray = new byte[this.body.length + contentDisposition.length + contentType.length + file.length + boundary.length];
-            System.arraycopy(this.body, 0, joinedArray, 0, this.body.length);
-            System.arraycopy(contentDisposition, 0, joinedArray, this.body.length, contentDisposition.length);
-            System.arraycopy(contentType, 0, joinedArray, this.body.length + contentDisposition.length, contentType.length);
-            System.arraycopy(file, 0, joinedArray, this.body.length + contentDisposition.length + contentType.length, file.length);
-            System.arraycopy(boundary, 0, joinedArray, this.body.length + contentDisposition.length + contentType.length + file.length, boundary.length);
-            this.body = joinedArray;
-            
+        @Override
+        public Response send() throws IOException, InterruptedException {
+            super.body = this.bodyBuilder.build();
+            return super.send();
+        }
+        
+        public FormRequest addParam(String key, String value) {
+            bodyBuilder.addEncoded(key, value);
             return this;
         }
         
-        /**
-         * 添加文件参数
-         * @param name 参数名称
-         * @param filePath 文件目录
-         * @return
-         * @throws IOException
-         */
-        public UploadParams addFile(String name, String filePath) throws IOException {
-            Path path = Paths.get(filePath);
-            String fileName = path.getFileName().toString();
-            byte[] file = Files.readAllBytes(path);
-            
-            return this.addFile(name, fileName, file);
-        }
-        
-        /**
-         * 添加参数
-         * @param key
-         * @param value
-         * @return
-         */
-        public UploadParams addParam(String key, String value) {
-            this.body[this.body.length - 2] = "\r".getBytes()[0];
-            this.body[this.body.length - 1] = "\n".getBytes()[0];
-            
-            byte[] contentDisposition = String.format("Content-Disposition: form-data; name=\"%s\"\r\n\r\n", key).getBytes();
-            
-            byte[] joinedArray = new byte[this.body.length + contentDisposition.length + value.getBytes().length + boundary.length];
-            System.arraycopy(this.body, 0, joinedArray, 0, this.body.length);
-            System.arraycopy(contentDisposition, 0, joinedArray, this.body.length, contentDisposition.length);
-            System.arraycopy(value.getBytes(), 0, joinedArray, this.body.length + contentDisposition.length, value.getBytes().length);
-            System.arraycopy(boundary, 0, joinedArray, this.body.length + contentDisposition.length + value.getBytes().length, boundary.length);
-            this.body = joinedArray;
-            
+        @Override
+        public FormRequest addHeader(String key, String value) {
+            super.addHeader(key, value);
             return this;
         }
         
-        /**
-         * 添加多个参数
-         * @param params
-         * @return
-         */
-        public UploadParams addParams(Map<String, String> params) {
-            for(Entry<String, String> item : params.entrySet()) {
-                this.addParam(item.getKey(), item.getValue());
-            }
-            
+        @Override
+        public FormRequest addHeaders(Map<String, String> headers) {
+            super.addHeaders(headers);
+            return this;
+        }
+    }
+    
+    public class UploadRequest extends Request {
+        private MultipartBody.Builder bodyBuilder = new MultipartBody.Builder().setType(MultipartBody.FORM);
+        
+        public UploadRequest(String url, String method, Map<String, String> headers) {
+            super(url, method, headers, null);
+        }
+        
+        @Override
+        public Response send() throws IOException, InterruptedException {
+            super.body = this.bodyBuilder.build();
+            return super.send();
+        }
+        
+        public UploadRequest addParam(String key, String value) {
+            bodyBuilder.addFormDataPart(key, value);
+            return this;
+        }
+        
+        public UploadRequest addFile(String key, String filename, byte[] file) {
+            bodyBuilder.addFormDataPart(key, filename, RequestBody.create(file, MediaType.parse("application/octet-stream")));
+            return this;
+        }
+        
+        public UploadRequest addFile(String key, File file) {
+            bodyBuilder.addFormDataPart(key, file.getName(), RequestBody.create(file, MediaType.parse("application/octet-stream")));
+            return this;
+        }
+        
+        @Override
+        public UploadRequest addHeader(String key, String value) {
+            super.addHeader(key, value);
+            return this;
+        }
+        
+        @Override
+        public UploadRequest addHeaders(Map<String, String> headers) {
+            super.addHeaders(headers);
             return this;
         }
     }
     
     public class Response {
-        private HttpResponse<byte[]> response;
+        public okhttp3.Response response;
         
-        private Response(HttpResponse<byte[]> response) {
+        private Response(okhttp3.Response response) {
             this.response = response;
         }
         
@@ -286,31 +281,33 @@ public class Http {
          * @return
          */
         public int statusCode() {
-            return this.response.statusCode();
+            return this.response.code();
         }
         
         /**
          * 获取响应头
          * @return
          */
-        public HttpHeaders headers() {
+        public Headers headers() {
             return this.response.headers();
         }
         
         /**
          * 获取响应体
          * @return
+         * @throws IOException 
          */
-        public byte[] bytes() {
-            return this.response.body();
+        public byte[] bytes() throws IOException {
+            return this.response.body().bytes();
         }
         
         /**
          * 获取字符串类型的响应体
          * @return
+         * @throws IOException 
          */
-        public String string() {
-            return new String(this.bytes());
+        public String string() throws IOException {
+            return this.response.body().string();
         }
         
         /**
@@ -319,7 +316,7 @@ public class Http {
          * @throws IOException
          */
         public JsonNode json() throws IOException {
-            return objectMapper.readTree(this.bytes());
+            return objectMapper.readTree(this.string());
         }
         
         /**

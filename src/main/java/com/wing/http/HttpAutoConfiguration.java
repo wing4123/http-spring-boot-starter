@@ -1,10 +1,5 @@
 package com.wing.http;
 
-import java.net.CookieManager;
-import java.net.http.HttpClient;
-import java.net.http.HttpClient.Redirect;
-import java.util.concurrent.Executors;
-
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
@@ -14,23 +9,21 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
+import okhttp3.OkHttpClient;
+
 @AutoConfiguration
 public class HttpAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    Http http(HttpClient httpClient, ObjectMapper objectMapper){
+    Http http(OkHttpClient httpClient, ObjectMapper objectMapper){
         return new Http(httpClient, objectMapper);
     }
     
     @Bean
     @ConditionalOnMissingBean
-    HttpClient httpClient() {
-    	return HttpClient.newBuilder()
-                .cookieHandler(new CookieManager())
-                .executor(Executors.newWorkStealingPool())
-                .followRedirects(Redirect.ALWAYS)
-                .build();
+    OkHttpClient httpClient() {
+    	return new OkHttpClient();
     }
 
     @Bean
