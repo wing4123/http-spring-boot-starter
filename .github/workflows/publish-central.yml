@@ -1,0 +1,36 @@
+name: Publish to Maven Central
+
+on:
+  workflow_dispatch
+
+jobs:
+  publish-maven-central:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Central Bundle
+        run: ./gradlew clean zipCentralBundle -x test
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Upload to Central Portal
+        run: |
+          curl -H "Authorization: Basic $(echo -n "${CENTRAL_USERNAME}:${CENTRAL_PASSWORD}" | base64)" \
+            -X POST "https://central.sonatype.com/api/v1/publisher/upload" \
+            -F "bundle=@build/central-bundle.zip" \
+            -F "publishingType=AUTOMATIC"
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}

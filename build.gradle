@@ -1,0 +1,142 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'signing'
+}
+
+group = 'io.github.wing4123'
+version = '0.3.1'
+description = 'http request utils'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("org.springframework.boot:spring-boot-autoconfigure:4.0.1")
+    implementation("tools.jackson.core:jackson-databind:3.0.3")
+
+    implementation(platform("com.squareup.okhttp3:okhttp-bom:5.3.2"))
+    implementation("com.squareup.okhttp3:okhttp")
+    implementation("com.squareup.okhttp3:logging-interceptor")
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            pom {
+                name = "http-spring-boot-starter"
+                description = "http request utils"
+                url = "https://github.com/wing4123/http-spring-boot-starter"
+
+                licenses {
+                    license {
+                        name = "The Apache Software License, Version 2.0"
+                        url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = "wing4123"
+                        name = "雾中仙"
+                        email = "wing4123@163.com"
+                    }
+                }
+
+                scm {
+                    connection = "scm:git:https://github.com/wing4123/http-spring-boot-starter.git"
+                    developerConnection = "scm:git:ssh://github.com/wing4123/http-spring-boot-starter.git"
+                    url = "https://github.com/wing4123/http-spring-boot-starter"
+                }
+            }
+        }
+    }
+}
+
+signing {
+    // useGpgCmd()
+    def signingKey = System.getenv("GPG_PRIVATE_KEY")
+    def signingPassword = System.getenv("GPG_PASSPHRASE")
+    useInMemoryPgpKeys(signingKey, signingPassword)
+    
+    sign publishing.publications.mavenJava
+}
+
+import java.security.MessageDigest
+
+def checksum(File file, String algo) {
+    MessageDigest md = MessageDigest.getInstance(algo)
+    file.eachByte(8192) { buffer, size ->
+        md.update(buffer, 0, size)
+    }
+    return md.digest().encodeHex().toString()
+}
+
+tasks.register('buildCentralBundle') {
+    dependsOn 'build', 'publishToMavenLocal'
+
+    doLast {
+        def pub = publishing.publications.mavenJava
+        def groupPath = pub.groupId.replace('.', '/')
+        def baseDir = file("$buildDir/central-bundle/$groupPath/${pub.artifactId}/${pub.version}")
+        baseDir.mkdirs()
+
+        def artifacts = []
+
+        // jars
+        copy {
+            from("$buildDir/libs")
+            include(
+                "${pub.artifactId}-${pub.version}.jar",
+                "${pub.artifactId}-${pub.version}-sources.jar",
+                "${pub.artifactId}-${pub.version}-javadoc.jar",
+                "*.asc"
+            )
+            into(baseDir)
+        }
+
+        // pom
+        copy {
+            from("$buildDir/publications/mavenJava")
+            include("pom-default.xml", "pom-default.xml.asc")
+            rename("pom-default.xml", "${pub.artifactId}-${pub.version}.pom")
+            rename("pom-default.xml.asc", "${pub.artifactId}-${pub.version}.pom.asc")
+            into(baseDir)
+        }
+
+        // collect files for checksum
+        baseDir.eachFile { f ->
+            if (!f.name.endsWith('.md5') && !f.name.endsWith('.sha1')) {
+                artifacts << f
+            }
+        }
+
+        // generate md5 / sha1
+        artifacts.each { f ->
+            file("${f.absolutePath}.md5").text = checksum(f, "MD5")
+            file("${f.absolutePath}.sha1").text = checksum(f, "SHA-1")
+        }
+
+        println "Central bundle prepared at:"
+        println baseDir
+    }
+}
+
+// zip central bundle
+tasks.register('zipCentralBundle', Zip) {
+    dependsOn 'buildCentralBundle'
+    from("$buildDir/central-bundle")
+    archiveFileName = "central-bundle.zip"
+    destinationDirectory = file("$buildDir")
+}
